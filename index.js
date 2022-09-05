@@ -41,10 +41,9 @@ async function init () {
 
             //changing slide activities IDs and setting course.slides
             Array.from(dom.getElementsByTagName('activity')).slice(1).forEach((a, index) => {
-                a.setAttribute('id', `${course.iri}/slide_${index}`)
                 course.slides.push({
                     index, 
-                    iri: `${course.iri}/slide_${index}`,
+                    iri: `${a.getAttribute('id')}`,
                     name: a.getElementsByTagName('name')[0].textContent
                 })
             })
