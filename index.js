@@ -129,7 +129,7 @@ async function init () {
             let zipName = f.includes(' - Storyline output') ? f.replace(' - Storyline output', '') : f
             let zip = new AdmZip();
             zip.addLocalFolder(path.join('_source', f));
-            zip.writeZip(path.join('_source', 'zip', `${zipName}_${folderDate}.zip`));
+            zip.writeZip(path.join('_source', '_zip', `${zipName}_${folderDate}.zip`));
             
         }
     })

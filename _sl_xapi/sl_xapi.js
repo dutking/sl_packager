@@ -76,7 +76,7 @@ class Course {
     }
 
     get completed() {
-        return this.slidesViewed === this.SL_totalSlides
+        return this.slidesViewed === this.slides.length
     }
 
     get slidesViewed() {
@@ -97,11 +97,13 @@ class Course {
         }
    }
 
-    proceedSlides(slideNumber){
+    async proceedSlides(slideNumber){
         this.currentSlide.exited()
-        this.lastSlideVisited = slideNumber
-        this.currentSlide = new Slide(this.slides.filter(s => s.index === slideNumber)[0])
-        this.currentSlide.interacted()
+        .then(() => {
+            this.lastSlideVisited = slideNumber
+            this.currentSlide = new Slide(this.slides.filter(s => s.index === slideNumber)[0])
+            this.currentSlide.interacted()
+        })
     }
 
     setMenu(){
@@ -111,8 +113,10 @@ class Course {
     exitCourse() {
         console.log(this.currentSlide)
         this.currentSlide.exited()
-        this.duration = this.duration + (new Date() - this.timeStarted)
-        XAPI.postState(this.iri, this.state)
+        .then(() => {
+            this.duration = this.duration + (new Date() - this.timeStarted)
+        })
+        .then(() => XAPI.postState(this.iri, this.state))
         .then(() => {
             if (this.SL_completed || this.completed) {
                 XAPI.sendStatement(
@@ -146,14 +150,31 @@ class Slide {
         this.name = slide.name
         this.iri = slide.iri
         this.timeStarted = new Date()
+        this.duration = 0
+    }
+
+    get state(){
+        return {
+            duration: this.duration,
+        }
     }
 
     interacted() {
         XAPI.sendStatement(new Statement('interacted', this).statement)
+        XAPI.getState(this.iri)
+        .then(data => {
+            if('duration' in data) {
+                this.duration = data.duration
+            }
+
+            return Promise.resolve()
+        })
     }
 
     exited() {
-        XAPI.sendStatement(new Statement('exited', this).statement)
+        this.duration = this.duration + (new Date() - this.timeStarted)
+        XAPI.postState(this.iri, this.state)
+        .then(() => XAPI.sendStatement(new Statement('exited', this).statement))
     }
 }
 
@@ -347,7 +368,7 @@ class Statement {
         this.name = item.name
         this.verbString = verb;
         this.time = new Date();
-        this.prevDuration = (this.item instanceof Course) ? this.item.duration : 0
+        this.duration = item.duration
     }
 
     get id() {
@@ -414,10 +435,10 @@ class Statement {
 
         if (this.verbString === 'completed') {
             Object.assign(object.result, {
-                completion: true,
+                completion: this.item.completed,
                 duration: moment
                     .duration(
-                        Math.round(((this.time - this.item.timeStarted) + this.prevDuration) / 1000),
+                        Math.round( this.duration / 1000),
                         'seconds'
                     )
                     .toISOString(),
@@ -429,13 +450,13 @@ class Statement {
                 success: this.verbString === 'passed' ? true : false,
                 score: {
                     raw: this.item.slidesViewed,
-                    scaled: (1 / this.item.SL_totalSlides) * this.item.slidesViewed,
+                    scaled: (1 / this.item.slides.length) * this.item.slidesViewed,
                     min: 0,
-                    max: this.item.SL_totalSlides,
+                    max: this.item.slides.length,
                 },
                 duration: moment
                     .duration(
-                        Math.round(((this.time - this.item.timeStarted) + this.prevDuration) / 1000),
+                        Math.round(this.duration / 1000),
                         'seconds'
                     )
                     .toISOString(),
@@ -446,7 +467,7 @@ class Statement {
             Object.assign(object.result, {
                 duration: moment
                     .duration(
-                        Math.round(((this.time - this.item.timeStarted) + this.prevDuration) / 1000),
+                        Math.round(this.duration / 1000),
                         'seconds'
                     )
                     .toISOString(),
