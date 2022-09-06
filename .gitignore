@@ -1,6 +1,8 @@
 node_modules
-_source
+__source
+__output
 old.js
 scripts.txt
 05_Obmen_zil_pom_TINCAN - Storyline output
 .DS_Store
+executables

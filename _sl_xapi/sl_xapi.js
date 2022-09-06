@@ -1,9 +1,9 @@
-class Course {
+class Course {lastSlideVisited
     constructor(course) {
         this.name = course.name
         this.iri = course.iri
         this.slides = course.slides
-        this.lastSlideVisited = 0
+        this.lastSlideVisited = ''
         this.timeStarted = new Date()
         this._slidesViewed = new Set()
         this.player = GetPlayer()
@@ -57,7 +57,7 @@ class Course {
 
     get state() {
         return {
-            completed: this.completed,
+            lastSlideVisited: this.lastSlideVisited,
             slidesViewed: Array.from(this._slidesViewed),
             duration: this.duration
         }
@@ -85,29 +85,32 @@ class Course {
 
     set slidesViewed(v){
         this._slidesViewed.add(v)
-        this.state.slidesViewed = Array.from(this._slidesViewed)
-    }
+     }
 
     updateSlidesViewed() {
-        let slideNumber = isNaN(this.player.GetVar('slideNumber')) ? 0 : this.player.GetVar('slideNumber')
-        this.slidesViewed = slideNumber
-        if(slideNumber !== 0) {
+        let slideId = this.player.GetVar('slideId')
+        this.slidesViewed = slideId
+        let index = window.course.slides.filter(slide => slide.iri.endsWith(slideId))[0].index
+        if(index !== 0) {
 
-            this.proceedSlides(slideNumber)
+            this.proceedSlides(slideId)
         }
    }
 
-    async proceedSlides(slideNumber){
+    async proceedSlides(slideId){
         this.currentSlide.exited()
         .then(() => {
-            this.lastSlideVisited = slideNumber
-            this.currentSlide = new Slide(this.slides.filter(s => s.index === slideNumber)[0])
+            this.lastSlideVisited = slideId
+            this.currentSlide = new Slide(window.course.slides.filter(slide => slide.iri.endsWith(slideId))[0])
             this.currentSlide.interacted()
         })
     }
 
     setMenu(){
-        Array.from(this._slidesViewed).forEach(slide => this.player.SetVar('slideVisited', slide))
+        Array.from(this._slidesViewed).forEach(slideId => {
+            let index = window.course.slides.filter(slide => slide.iri.endsWith(slideId))[0].index
+            this.player.SetVar('slideVisited', index)
+        })
     }
 
     exitCourse() {
@@ -173,7 +176,7 @@ class Slide {
 
     exited() {
         this.duration = this.duration + (new Date() - this.timeStarted)
-        XAPI.postState(this.iri, this.state)
+        return XAPI.postState(this.iri, this.state)
         .then(() => XAPI.sendStatement(new Statement('exited', this).statement))
     }
 }

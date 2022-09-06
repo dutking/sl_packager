@@ -21,12 +21,22 @@ async function init () {
         slides: []
     }
 
-    let files = await fs.readdir('_source')
+    fs.ensureDirSync('__output')
+    fs.ensureDirSync('__output', 'temp')
+
+    let files = await fs.readdir('__source')
     files.forEach(f => {
-        if(fs.lstatSync(path.join('_source', f)).isDirectory() && fs.existsSync(path.join('_source', f, 'story.html'))){
+        
+        if(fs.lstatSync(path.join('__source', f)).isDirectory() && fs.existsSync(path.join('__source', f, 'story.html'))){
+            //copying files
+            console.log('Copying files')
+            fs.copySync(path.join('__source', f), path.join('__output', 'temp', f))
+
+            //modifying tincan.xml
+            console.log('Modifying TINCAN.xml...')
             // parsing tincan.xml to get course data and to modify 
             const parser = new DOMParser()
-            let dom = parser.parseFromString(fs.readFileSync(path.join('_source', f, 'tincan.xml'), 'utf-8'), 'text/xml')
+            let dom = parser.parseFromString(fs.readFileSync(path.join('__output', 'temp', f, 'tincan.xml'), 'utf-8'), 'text/xml')
 
             //getting course.id
             course.iri = dom.getElementsByTagName('activity')[0].getAttribute('id')
@@ -49,13 +59,14 @@ async function init () {
             })
 
             fs.outputFileSync(
-                path.join('_source', f, 'tincan.xml'),
+                path.join('__output', 'temp', f, 'tincan.xml'),
                 new XMLSerializer().serializeToString(dom),
                 'utf-8'
             )
 
             //adding scripts to story.html
-            let storyHTML = fs.readFileSync(path.join('_source', f, 'story.html'), 'utf-8')
+            console.log('Modifying STORY.HTML...')
+            let storyHTML = fs.readFileSync(path.join('__output', 'temp', f, 'story.html'), 'utf-8')
             let html = HTMLParser.parse(storyHTML, {
                 lowerCaseTagName: false,
                 comment: false,
@@ -83,12 +94,13 @@ async function init () {
             `
             head.set_content(headData + headScripts);
             fs.outputFileSync(
-                path.join('_source', f, 'story.html'),
+                path.join('__output', 'temp', f, 'story.html'),
                 html.toString(),
                 'utf-8'
             )
 
             //create structure.json
+            console.log('Creating STRUCTURE.JSON...')
             let structure = `
             {
                 "id": "${course.iri}",
@@ -114,25 +126,32 @@ async function init () {
             `
 
             fs.outputFileSync(
-                path.join('_source', f, 'structure.json'),
+                path.join('__output', 'temp', f, 'structure.json'),
                 structure,
                 'utf-8'
             )
 
             //deleting files
-            fs.rmSync(path.join('_source', f, 'lms'), { recursive: true, force: true });
-            fs.unlinkSync(path.join('_source', f, 'analytics-frame.html'))
-            fs.unlinkSync(path.join('_source', f, 'index_lms.html'))
-            fs.copySync('_sl_xapi', path.join('_source', f, '_sl_xapi'))
+            console.log('Removing unused files...')
+            fs.rmSync(path.join('__output', 'temp', f, 'lms'), { recursive: true, force: true });
+            fs.unlinkSync(path.join('__output', 'temp', f, 'analytics-frame.html'))
+            fs.unlinkSync(path.join('__output', 'temp', f, 'index_lms.html'))
+            fs.copySync('_sl_xapi', path.join('__output', 'temp', f, '_sl_xapi'))
 
             //creating zip
+            console.log('Zipping...')
             let zipName = f.includes(' - Storyline output') ? f.replace(' - Storyline output', '') : f
             let zip = new AdmZip();
-            zip.addLocalFolder(path.join('_source', f));
-            zip.writeZip(path.join('_source', '_zip', `${zipName}_${folderDate}.zip`));
+            zip.addLocalFolder(path.join('__output', 'temp', f));
+            zip.writeZip(path.join('__output', `${zipName}_${folderDate}.zip`));
+
+            console.log('Removing TEMP...')
+            fs.rmSync(path.join('__output', 'temp'), { recursive: true, force: true });
             
         }
     })
+
+    console.log('DONE')
 }
 
 init()
